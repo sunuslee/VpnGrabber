@@ -1,0 +1,35 @@
+This VpnGrabber is coded by sunus lee
+Last time modified :    May 30 , 2011
+thanks to asvpn.com , the site provide good vpns
+thanks to google.com , their gmail alias support
+made this software work perfectly!
+
+here is how it work:
+signup in asvpn.com and verified a email addres
+will recieve a verify link,click that link we will
+get a free vpn account , which lasts ONE HOUR
+
+so , this software can automatically register a account
+and send a request to verified email , and finally .
+login the email, fetch the verified mail , analyze and
+fetch the verified link. all you need to do is quite simple
+1:
+In the very first attempt : run with a SpeciaToken as a parameter:
+./VpnGrabber IlikeVPN
+then, the software will use those username and password :
+IlikeVPN_0001
+IlikeVPN_0002
+IlikeVPN_9999
+i think u won't use this more than 9999 hours ,aren't you?
+
+2:
+After the very first attempt
+Just run it WITHOUT ANY PARAMETERS
+the username and password are automatically generated
+so all  you need to do is just click the verified the link
+and change VPN username and password
+
+P.S
+I hope someone can make a script or something like
+that to automatically set up vpn settings.
+like fill in the username and password:<
