@@ -34,6 +34,7 @@ char password[16] ;
 char email_0[] = {"sunuslikeme%2B"}; /* %2B == '+' ,thanks to google , we can use ALIAS*/
 char email_1[] = {"%40gmail.com"};   /* %40 == '@' */
 char email[64] ;
+/* i set up this mail so that it can auto-forward verify_code to a pop3 mail */
 char *post1 = "utf8=%E2%9C%93&authenticity_token=";
 
 /* packet to registration */
@@ -251,8 +252,8 @@ int main(int argc, char *argv[])
         if(argc >= 2)
         {
                 if((argc == 2) && 
-                   (strlen(argv[1]) < 15))
-                      ;  /* We're safe */
+                                (strlen(argv[1]) < 15))
+                        ;  /* We're safe */
                 else
                 {
                         printf("\n\n\nUserage : VpnGrabber -SpeciaToken for the first time\n");
@@ -294,17 +295,17 @@ int main(int argc, char *argv[])
                         fd_login = socket(AF_INET, SOCK_STREAM, 0);
                         if(connect(fd_login, (struct sockaddr *)&sin, sizeof(sin)) == 0)
                         {
-                                memset(request, 0, sizeof(request));
-                                memset(post_t, 0, sizeof(post_t));
-                                strcpy(post_t, post1);
-                                strcat(post_t, auth_conv);
-                                strcat(post_t, post_login);
-                                do_post(fd_login, "/sessions", addr, request, post_t, "http://www.asvpn.com/signin", (char *)&cookie_buf);
-                                // update cookie 
-                                find_from_header(respond.header,  "Set-Cookie: ", (char *)&cookie_buf, 2048);
-                                printf("new cook is \n%s",cookie_buf);
+                        memset(request, 0, sizeof(request));
+                        memset(post_t, 0, sizeof(post_t));
+                        strcpy(post_t, post1);
+                        strcat(post_t, auth_conv);
+                        strcat(post_t, post_login);
+                        do_post(fd_login, "/sessions", addr, request, post_t, "http://www.asvpn.com/signin", (char *)&cookie_buf);
+                        // update cookie 
+                        find_from_header(respond.header,  "Set-Cookie: ", (char *)&cookie_buf, 2048);
+                        printf("new cook is \n%s",cookie_buf);
                         }
-                        */
+                         */
                         // make datas(registration) to be posted
                         fd_post_reg = socket(AF_INET, SOCK_STREAM, 0);
                         if(fd_post_reg < 0)
@@ -336,17 +337,32 @@ int main(int argc, char *argv[])
                         }
                         DEBUG(MODE,"fd_post ready to post!\n\n\n\n");
                         if(connect(fd_post_mail, (struct sockaddr *)&sin, sizeof(sin)) == 0)
-                                        do_post(fd_post_mail, "/users/verify_email", addr, request, post_t, 
-                                                        "http://www.asvpn.com/users/verify_form",
-                                                        (char *)&cookie_buf);
+                                do_post(fd_post_mail, "/users/verify_email", addr, request, post_t, 
+                                                "http://www.asvpn.com/users/verify_form",
+                                                (char *)&cookie_buf);
                         close(fd_post_mail);
                         printf("mail is on the way!\n");
                         sleep(20);
                         printf("\n*******************************\n");
                         email_main();
+
+                        printf("\n******************************************************\n\n");
+                        printf("The ips are: MAIN ADDRESS -- BACKUP ADDRESS\n"
+                                        "us001.asvpn.com -- us001.fast-as.info\n"
+                                        "us002.asvpn.com -- us002.fast-as.info (No speed limit)\n"
+                                        "us003.asvpn.com -- us003.fast-as.info (No speed limit)\n"
+                                        "us004.asvpn.com -- us004.fast-as.info\n"
+                                        "us005.asvpn.com -- us005.fast-as.info\n"
+                                        "us006.asvpn.com -- us006.fast-as.info\n"
+                                        "us007.asvpn.com -- us007.fast-as.info (No speed limit)\n"
+                                        "us008.asvpn.com -- us008.fast-as.info\n"
+                                        "us009.asvpn.com -- us009.fast-as.info\n");
+                        printf("\n******************************************************\n");
                 }
+
         }
-        return 0;
+
+return 0;
 }
 
 void conv(char *in, char *out)
@@ -394,8 +410,8 @@ void get_auth()
 /* you need to add \r\n yourself ! */
 #define CMD(cmd_buf, cmd, args) strcmp(args, "\r\n") == 0 ? sprintf(cmd_buf,"%s%s", cmd,args) : sprintf(cmd_buf, "%s %s", cmd, args)
 char *mail_addr = "pop3.163.com";
-char *user = "cs_jonas_johnnyr\r\n";
-char *pass = "6328100\r\n";
+char *user = "sunusgotvpn\r\n";
+char *pass = "vpngotsunus\r\n";
 char sendcmd[32];
 char mail_respond[1024] ;
 char verify_url_final[256];
@@ -522,8 +538,12 @@ void email_main()
                         DEBUG(1,"connect error!\n");
                 }
                 email_login(mail, user, pass);
-                email_get_verify_url(mail);
-
+                if(email_get_verify_url(mail) == NULL)
+                {
+                        printf("retry : please wait...");
+                        if(email_get_verify_url(mail) == NULL)
+                                printf("we're done! admin find us>.<\n\n");
+                }
         }
         else
         {
