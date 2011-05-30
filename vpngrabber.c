@@ -8,10 +8,14 @@
 #include <netdb.h>
 #include <string.h>
 #include <glib.h>
+#define MODE_RELEASE 0
+#define MODE_DEBUG !MODE_RELEASE
+#define MODE MODE_RELEASE      /* control output info */
 #define PORT 80
 #define HEADER_MAX_NR 16
 #define HEADER_MAX_LEN 512
 #define RESPON_BUF_SIZE 10240
+#define DEBUG(on,...) do{if(on) printf(__VA_ARGS__);}while(0)
 void email_main();
 void email_login(int fd, char *username, char *password);
 char *email_get_verify_url(int fd);
@@ -94,7 +98,7 @@ int http_recv(int fd, char *buf, int buf_size)
                         *(respond.body + 4) = '\0';
                         respond.body += 5;
                         is_header = FALSE;
-                        printf("get header :\n%s\n",respond.header);
+                        DEBUG(MODE,"get header :\n%s\n",respond.header);
                 }
                 buf += recv_size;
         }
@@ -121,7 +125,7 @@ int find_from_header(char *header, char *find, char *result, int result_size)
                         i = sprintf(result,"%s%s",result,(char *)&(find_from_header_result.datas[find_from_header_result.items]));
                         result[i - 2] = ';';
                         result[i - 1] = '\0';
-                        printf("found a %s #%d\n%s", find, find_nr, (char *)(find_from_header_result.datas)[find_from_header_result.items]);
+                        DEBUG(MODE,"found a %s #%d\n%s", find, find_nr, (char *)(find_from_header_result.datas)[find_from_header_result.items]);
                         find_next += find_len;
                         find_nr++;
                         find_from_header_result.items++;
@@ -156,11 +160,12 @@ void do_get(int fd, char *reqbuff, char *uri, char *host, char *cookie)
         /* unnecessarily i think */
 #endif
         next_post = sprintf(rb += next_post, "\r\n");
-        printf("sending request : size = %d\n", send_size = strlen(reqbuff));
-        printf("%s\n\n",reqbuff);
+        send_size = strlen(reqbuff);
+        DEBUG(MODE,"sending request : size = %d\n", send_size);
+        DEBUG(MODE,"%s\n\n",reqbuff);
         recv_size = 0;
         send_size = send(fd, reqbuff, send_size, 0);
-        printf("%d bytes sent\n",send_size);
+        DEBUG(MODE,"%d bytes sent\n",send_size);
         http_recv(fd, respond.buf, RESPON_BUF_SIZE);
 }
 void do_post(int fd, char *uri, char *host, char *postbuf, char *req, char *ref ,char *cookie)
@@ -187,9 +192,10 @@ void do_post(int fd, char *uri, char *host, char *postbuf, char *req, char *ref 
         next_post = sprintf(pb += next_post, "Content-Length: %d\r\n",strlen(req));
         next_post = sprintf(pb += next_post, "\r\n");
         next_post = sprintf(pb += next_post, "%s",req);
-        printf("post is\n%s\nsize = %d\n",postbuf,send_size = strlen(postbuf));
+        send_size = strlen(postbuf);
+        DEBUG(MODE,"post is\n%s\nsize = %d\n",postbuf,send_size);
         send_size = send(fd, postbuf, send_size, 0);
-        printf("\n%d by sent",send_size);
+        DEBUG(MODE,"\n%d by sent",send_size);
         http_recv(fd, respond.buf, RESPON_BUF_SIZE);
 }
 
@@ -207,19 +213,18 @@ void user_info_init(char *info)
         int num_pos;
         char *pinfo ;
         char history[32] = {0};
-        char num[4] = {0};
         if(info == NULL) /* load from history */
         {
                 f = fopen("history", "rb+");
                 fread(history, sizeof(char), 32, f);
-                printf("read : %s\n",history);
+                DEBUG(MODE,"read : %s\n",history);
                 num_pos = strlen(history);
                 pinfo = &history[num_pos - 4];
                 sscanf(pinfo,"%04d",&postfix);
                 history[num_pos - 4] = '\0';
                 postfix++;
                 sprintf(history,"%s%04d",history, postfix);
-                printf("new hist = %s",history);
+                DEBUG(MODE,"new history = %s",history);
                 fseek(f, 0, SEEK_SET);
         }
         else    /* creat history from info*/
@@ -264,7 +269,7 @@ int main(int argc, char *argv[])
                 {
                         sin = *((struct sockaddr_in *)ai->ai_addr);
                         inet_ntop(AF_INET, &(sin.sin_addr), addrstr, 32);
-                        printf("addr = %s : port = %hd \n",addrstr,(ntohs(sin.sin_port)));
+                        DEBUG(MODE,"addr = %s : port = %hd \n",addrstr,(ntohs(sin.sin_port)));
                         ai = ai->ai_next;
                 }
                 fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -275,12 +280,12 @@ int main(int argc, char *argv[])
                 }
                 if(connect(fd, (struct sockaddr *)&sin, sizeof(sin)) == 0)
                 {
-                        printf("connection success!\n");
+                        DEBUG(MODE,"connection success!\n");
                         do_get(fd, (char *)&request, "/signup", addr, NULL);
 
                         find_from_header(respond.header,  "Set-Cookie: ", (char *)&cookie_buf, 2048);
                         get_auth();
-                        printf("\ncookie = %s\n",cookie_buf);
+                        DEBUG(MODE,"\ncookie = %s\n",cookie_buf);
                         /*
                         // login
                         strcpy(post_t, post1);
@@ -309,14 +314,14 @@ int main(int argc, char *argv[])
                         }
                         if(connect(fd_post_reg, (struct sockaddr *)&sin, sizeof(sin)) == 0)
                         {
-                                printf("fd_post ready to post!\n\n\n\n");
+                                DEBUG(MODE,"fd_post ready to post!\n\n\n\n");
                                 sprintf(post_t,"%s%s%s%s%s%s%s%s%s",
                                                 post1,auth_conv,post2_0,username,post2_1,password,post2_2,password,post2_3);
-                                printf("post1 = %s\n",post_t);
+                                DEBUG(MODE,"post1 = %s\n",post_t);
                                 do_post(fd_post_reg, "/users", addr, request, post_t, NULL, (char *)&cookie_buf);
                                 // update cookie 
                                 find_from_header(respond.header,  "Set-Cookie: ", (char *)&cookie_buf, 2048);
-                                printf("new cook is \n%s",cookie_buf);
+                                DEBUG(MODE,"new cook is \n%s",cookie_buf);
                                 close(fd_post_reg);
                         }
                         // make datas(email) to be post
@@ -326,10 +331,10 @@ int main(int argc, char *argv[])
                         fd_post_mail = socket(AF_INET, SOCK_STREAM, 0);
                         if(fd_post_mail < 0 )
                         {
-                                printf("socket error %s = %d\n","fd_post_mail",fd_post_mail);
+                                DEBUG(1,"socket error %s = %d\n","fd_post_mail",fd_post_mail);
                                 return 1;
                         }
-                        printf("fd_post ready to post!\n\n\n\n");
+                        DEBUG(MODE,"fd_post ready to post!\n\n\n\n");
                         if(connect(fd_post_mail, (struct sockaddr *)&sin, sizeof(sin)) == 0)
                                         do_post(fd_post_mail, "/users/verify_email", addr, request, post_t, 
                                                         "http://www.asvpn.com/users/verify_form",
@@ -360,7 +365,7 @@ void conv(char *in, char *out)
                 {
                         *pout++ = '%';
                         hex = *pin;
-                        printf("Got a symbol = %2X\n",hex);
+                        DEBUG(MODE,"Got a symbol = %2X\n",hex);
                         snprintf(pout,3,"%2X",hex);
                         pout+=2;
                 }
@@ -377,18 +382,17 @@ void get_auth()
         if((find_auth = strstr(respond.body, "\"authenticity_token\" type=\"hidden\" value=\"")) != NULL)
         {
                 find_auth += 42;
-                printf("get authenticity_token :\n");
+                DEBUG(MODE,"get authenticity_token :\n");
                 snprintf(auth, 45, "%s",find_auth);
-                printf("%s\n",auth);
+                DEBUG(MODE,"%s\n",auth);
                 conv(auth, auth_conv);
-                printf("convert to :\n%s",auth_conv);   /* this area should only run once! , since the authenticity_token doesn't change */
+                DEBUG(MODE,"convert to :\n%s",auth_conv);   /* this area should only run once! , since the authenticity_token doesn't change */
         }
 }
 
 
 /* you need to add \r\n yourself ! */
 #define CMD(cmd_buf, cmd, args) strcmp(args, "\r\n") == 0 ? sprintf(cmd_buf,"%s%s", cmd,args) : sprintf(cmd_buf, "%s %s", cmd, args)
-#define DEBUG(on,...) if(on) printf(__VA_ARGS__);
 char *mail_addr = "pop3.163.com";
 char *user = "cs_jonas_johnnyr\r\n";
 char *pass = "6328100\r\n";
@@ -404,17 +408,17 @@ void email_login(int fd, char *username, char *password)
 
         CMD(sendcmd, "user", username);
         data_size = send(fd, sendcmd, strlen(sendcmd), 0);
-        DEBUG(1,"send data : LEN = %d\n%s\n",strlen(sendcmd), sendcmd); 
+        DEBUG(MODE,"send data : LEN = %d\n%s\n",strlen(sendcmd), sendcmd); 
         
         data_size = recv(fd, mail_respond, 1024, 0);
-        DEBUG(1,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
+        DEBUG(MODE,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
         
         CMD(sendcmd, "pass", password);
         data_size = send(fd, sendcmd, strlen(sendcmd), 0);
-        DEBUG(1,"send data : LEN = %d\n%s\n",strlen(sendcmd),sendcmd);
+        DEBUG(MODE,"send data : LEN = %d\n%s\n",strlen(sendcmd),sendcmd);
         
         data_size = recv(fd, mail_respond, 1024, 0);
-        DEBUG(1,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
+        DEBUG(MODE,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
 
 }
 #define VERIFY_CODE_LEN 32
@@ -433,10 +437,10 @@ char *email_get_verify_url(int fd)
         gsize b64_len = 2048;
         CMD(sendcmd,"list","\r\n");
         data_size = send(fd, sendcmd, strlen(sendcmd), 0);
-        DEBUG(1,"send data : LEN = %d\n%s\n",strlen(sendcmd), sendcmd); 
+        DEBUG(MODE,"send data : LEN = %d\n%s\n",strlen(sendcmd), sendcmd); 
         
         data_size = recv(fd, mail_respond, 1024, 0);
-        DEBUG(1,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
+        DEBUG(MODE,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
         
 
         /* get the mail numbers , the respond is like this :
@@ -444,42 +448,43 @@ char *email_get_verify_url(int fd)
         */
         strncpy(str_get_mail_nr, mail_respond, sizeof(str_get_mail_nr));
         sscanf(str_get_mail_nr, "+OK %d%*s",&mail_nr);
-        printf("mail nr = %d\n", mail_nr);
+        DEBUG(MODE,"mail nr = %d\n", mail_nr);
 
         /* get the latest mail */
         sprintf(str_get_mail_nr, "%d\r\n",mail_nr);
 
         CMD(sendcmd, "retr", str_get_mail_nr);
         data_size = send(fd, sendcmd, strlen(sendcmd), 0);
-        DEBUG(1,"send data : LEN = %d\n%s\n",strlen(sendcmd), sendcmd);
+        DEBUG(MODE,"send data : LEN = %d\n%s\n",strlen(sendcmd), sendcmd);
 
         while((data_size = recv(fd, mail_respond, 1024, 0)) > 0)
         {
-                DEBUG(1,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
+                DEBUG(MODE,"recv data : LEN = %d\n%s\n",strlen(mail_respond),mail_respond);
 
                 if((find_base64 = strstr(mail_respond,"Content-Transfer-Encoding: base64")) != NULL)
                 {
                         find_base64 += strlen("Content-Transfer-Encoding: base64\r\n\r\n");
                         while(*find_base64 != '\n')
                                 find_base64++;
-                        printf("b64 start here!\n");
+                        DEBUG(MODE,"b64 start here!\n");
                         strncpy(base64_input, find_base64, strlen(find_base64));
-                        printf("%s",base64_input);
-                        printf("AFTER DECODE\n\n");
+                        DEBUG(MODE,"%s",base64_input);
+                        DEBUG(MODE,"AFTER DECODE\n\n");
                         pbase64_decode = (char *)g_base64_decode(base64_input, &b64_len);
-                        printf("%s",pbase64_decode);
+                        DEBUG(MODE,"%s",pbase64_decode);
                 }
                 if(pbase64_decode && ((find_verify_code = strstr(pbase64_decode, "verify=")) != NULL))
                 {
                         find_verify_code += 7; /* right behind verify= */
                         memset(verify_code, 0, sizeof(verify_code));
                         strncpy(verify_code, find_verify_code, 34);
-                        DEBUG(1,"FOUND THE V:\n%s",verify_code);
+                        DEBUG(MODE,"FOUND THE V:\n%s",verify_code);
                         /* Make the final verify_url */
                         sprintf(verify_url_final,"%s%s%s%s",verify_url_0,username,verify_url_1,verify_code);
                         printf("verify_url_final = :\n%s\n",verify_url_final);
                         free(pbase64_decode);
                         close(fd);
+                        printf("username : %s\npassword : %s\nemail : %s\n",username,password,email);
                         return (char *)&verify_url_final;
                 }
                 sleep(1);
@@ -501,20 +506,20 @@ void email_main()
                 {
                         sin = *((struct sockaddr_in *)ai->ai_addr);
                         inet_ntop(AF_INET, &(sin.sin_addr), addrstr, 32);
-                        printf("addr = %s : port = %hd \n",addrstr,(ntohs(sin.sin_port)));
+                        DEBUG(MODE,"addr = %s : port = %hd \n",addrstr,(ntohs(sin.sin_port)));
                         ai = ai->ai_next;
                 }
                 mail = socket(AF_INET, SOCK_STREAM, 0);
                 if(mail < 0)
                 {
-                        printf("socket error fd = %d\n",mail);
+                        DEBUG(1,"socket error fd = %d\n",mail);
                         return ;
                 }
                 if(( r = connect(mail, (struct sockaddr *)&sin, sizeof(sin))) == 0)
-                        printf("connect success!\n");
+                        DEBUG(MODE,"connect success!\n");
                 else
                 {
-                        printf("connect error!\n");
+                        DEBUG(1,"connect error!\n");
                 }
                 email_login(mail, user, pass);
                 email_get_verify_url(mail);
