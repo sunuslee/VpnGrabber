@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <fcntl.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -21,9 +24,12 @@ struct _find_from_header_result
 void get_auth();
 void conv(char *in, char *out);
 void do_post(int fd, char *uri, char *host, char *postbuf, char *req, char *ref, char *cookie);
-char username[16] = {"goodnight"};
-char password[16] = {"goodnight"};
-char email[64] = {"sunuslikeme%2Bsleep%40gmail.com"}; /* @ == %40 */
+char username[16] ;
+char password[16] ;
+
+char email_0[] = {"sunuslikeme%2B"}; /* %2B == '+' ,thanks to google , we can use ALIAS*/
+char email_1[] = {"%40gmail.com"};   /* %40 == '@' */
+char email[64] ;
 char *post1 = "utf8=%E2%9C%93&authenticity_token=";
 
 /* packet to registration */
@@ -78,8 +84,6 @@ int linecpy(char *dst, char *src)
 int http_recv(int fd, char *buf, int buf_size)
 {
         int recv_size;
-        int len;
-        char *copy;
         int is_header = TRUE;
         memset(buf, 0, buf_size);
         for(recv_size = 0 ; (recv_size = recv(fd, buf, buf_size, 0)) > 0 ; )
@@ -134,10 +138,7 @@ void do_get(int fd, char *reqbuff, char *uri, char *host, char *cookie)
 {
         int next_post = 0;
         char *rb = reqbuff;
-        char *find_auth = NULL;
-        char *find_cookie = NULL;
         int send_size,recv_size;
-        int disable_content = 0;
         next_post = sprintf(rb, "GET ");
         next_post = sprintf(rb += next_post, "%s ",uri);         
         next_post = sprintf(rb += next_post, "HTTP/1.1\r\n");
@@ -165,7 +166,6 @@ void do_get(int fd, char *reqbuff, char *uri, char *host, char *cookie)
 void do_post(int fd, char *uri, char *host, char *postbuf, char *req, char *ref ,char *cookie)
 {
         int send_size;
-        int recv_size ;
         int next_post = 0;
         char *pb = postbuf;
         next_post = sprintf(pb, "POST ");
@@ -192,14 +192,71 @@ void do_post(int fd, char *uri, char *host, char *postbuf, char *req, char *ref 
         printf("\n%d by sent",send_size);
         http_recv(fd, respond.buf, RESPON_BUF_SIZE);
 }
-int main()
+
+/* 
+ *  init the username , password , email in this pattern
+ *  user_0001
+ *  user_0002
+ *  .........
+ *  user_9999
+ */
+void user_info_init(char *info)
 {
-        int fd,fd_post_reg,fd_post_mail,fd_get_ov,fd_login;
-        int fd_size,send_size,recv_size;
+        FILE *f;
+        int postfix;
+        int num_pos;
+        char *pinfo ;
+        char history[32] = {0};
+        char num[4] = {0};
+        if(info == NULL) /* load from history */
+        {
+                f = fopen("history", "rb+");
+                fread(history, sizeof(char), 32, f);
+                printf("read : %s\n",history);
+                num_pos = strlen(history);
+                pinfo = &history[num_pos - 4];
+                sscanf(pinfo,"%04d",&postfix);
+                history[num_pos - 4] = '\0';
+                postfix++;
+                sprintf(history,"%s%04d",history, postfix);
+                printf("new hist = %s",history);
+                fseek(f, 0, SEEK_SET);
+        }
+        else    /* creat history from info*/
+        {
+                f = fopen("history", "ab");
+                sprintf(history,"%s_0000",info);
+        }
+
+        fwrite((void *)history, sizeof(char), strlen(history), f);
+        pinfo = history;
+        sprintf(username, "%s", pinfo);
+        sprintf(password, "%s", pinfo);
+        sprintf(email, "%s%s%s",email_0,pinfo,email_1);
+        printf("username : %s\npassword : %s\nemail : %s\n",username,password,email);
+        fclose(f);
+}
+int main(int argc, char *argv[])
+{
+        int fd,fd_post_reg,fd_post_mail;
         struct addrinfo *ai;
         struct sockaddr_in sin;
         char addrstr[32];
         int errno;
+        if(argc >= 2)
+        {
+                if((argc == 2) && 
+                   (strlen(argv[1]) < 15))
+                      ;  /* We're safe */
+                else
+                {
+                        printf("\n\n\nUserage : VpnGrabber -SpeciaToken for the first time\n");
+                        printf("when the first time success , Use ./VpnGrabber\n\n\n\n");
+                        return 1;
+                }
+        }
+        printf("Good luck ! we're good to go\n");
+        user_info_init(argc == 2 ? argv[1] : NULL);
         memset(sin.sin_zero, 0, sizeof(sin.sin_zero));
         if((errno = getaddrinfo(addr, "http", NULL, &ai)) == 0)
         {
@@ -277,10 +334,10 @@ int main()
                                         do_post(fd_post_mail, "/users/verify_email", addr, request, post_t, 
                                                         "http://www.asvpn.com/users/verify_form",
                                                         (char *)&cookie_buf);
-                                close(fd_post_mail);
+                        close(fd_post_mail);
+                        printf("mail is on the way!\n");
                         sleep(20);
                         printf("\n*******************************\n");
-                        printf("mail is on the way!\n");
                         email_main();
                 }
         }
@@ -328,12 +385,6 @@ void get_auth()
         }
 }
 
-/* backups */
-//*char *post1 = "utf8=%E2%9C%93&authenticity_token=";
-//*char *post2 = "&user%5Busername%5D=iamemailll&user%5Bpassword%5D=iamemailll&user%5Bpassword_confirmation%5D=iamemailll&commit=%E6%B3%A8%E5%86%8C";
-//*char *post3 = "&user%5Bemail%5D=iamemail2%40eyou.com&commit=%E5%8F%91%E9%80%81%E9%AA%8C%E8%AF%81%E9%82%AE%E4%BB%B6";
-//*char *post_login = "&session%5Busername%5D=iwantp0st&session%5Bpassword%5D=iwantp0st&commit=%E7%99%BB%E9%99%86";
-/* backups */
 
 /* you need to add \r\n yourself ! */
 #define CMD(cmd_buf, cmd, args) strcmp(args, "\r\n") == 0 ? sprintf(cmd_buf,"%s%s", cmd,args) : sprintf(cmd_buf, "%s %s", cmd, args)
@@ -379,7 +430,7 @@ char *email_get_verify_url(int fd)
         char *find_base64 = NULL;
         char base64_input[2048];
         char *pbase64_decode = NULL;
-        int b64_len = 2048;
+        gsize b64_len = 2048;
         CMD(sendcmd,"list","\r\n");
         data_size = send(fd, sendcmd, strlen(sendcmd), 0);
         DEBUG(1,"send data : LEN = %d\n%s\n",strlen(sendcmd), sendcmd); 
@@ -415,7 +466,7 @@ char *email_get_verify_url(int fd)
                         strncpy(base64_input, find_base64, strlen(find_base64));
                         printf("%s",base64_input);
                         printf("AFTER DECODE\n\n");
-                        pbase64_decode = g_base64_decode(base64_input, &b64_len);
+                        pbase64_decode = (char *)g_base64_decode(base64_input, &b64_len);
                         printf("%s",pbase64_decode);
                 }
                 if(pbase64_decode && ((find_verify_code = strstr(pbase64_decode, "verify=")) != NULL))
@@ -433,6 +484,7 @@ char *email_get_verify_url(int fd)
                 }
                 sleep(1);
         }
+        return NULL;
 }
 
 void email_main()
