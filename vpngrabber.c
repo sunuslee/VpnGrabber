@@ -256,7 +256,7 @@ int main(int argc, char *argv[])
                         ;  /* We're safe */
                 else
                 {
-                        printf("\n\n\nUserage : VpnGrabber -SpeciaToken for the first time\n");
+                        printf("\n\n\nUsage : VpnGrabber -SpeciaToken for the first time\n");
                         printf("when the first time success , Use ./VpnGrabber\n\n\n\n");
                         return 1;
                 }

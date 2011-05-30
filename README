@@ -13,6 +13,10 @@ so , this software can automatically register a account
 and send a request to verified email , and finally .
 login the email, fetch the verified mail , analyze and
 fetch the verified link. all you need to do is quite simple
+
+
+/* USAGE *
+
 1:
 In the very first attempt : run with a SpeciaToken as a parameter:
 ./VpnGrabber IlikeVPN
