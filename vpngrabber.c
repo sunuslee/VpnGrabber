@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <string.h>
 #include <glib.h>
+
 #define MODE_RELEASE 0
 #define MODE_DEBUG !MODE_RELEASE
 #define MODE MODE_RELEASE      /* control output info */
@@ -34,6 +35,7 @@ char password[16] ;
 char email_0[] = {"sunuslikeme%2B"}; /* %2B == '+' ,thanks to google , we can use ALIAS*/
 char email_1[] = {"%40gmail.com"};   /* %40 == '@' */
 char email[64] ;
+char verify_url_final[256];
 /* i set up this mail so that it can auto-forward verify_code to a pop3 mail */
 char *post1 = "utf8=%E2%9C%93&authenticity_token=";
 
@@ -163,11 +165,12 @@ void do_get(int fd, char *reqbuff, char *uri, char *host, char *cookie)
         next_post = sprintf(rb += next_post, "\r\n");
         send_size = strlen(reqbuff);
         DEBUG(MODE,"sending request : size = %d\n", send_size);
-        DEBUG(MODE,"%s\n\n",reqbuff);
+        DEBUG(1,"%s\n\n",reqbuff);
         recv_size = 0;
         send_size = send(fd, reqbuff, send_size, 0);
         DEBUG(MODE,"%d bytes sent\n",send_size);
         http_recv(fd, respond.buf, RESPON_BUF_SIZE);
+        DEBUG(MODE,"recv :\n%s\n",respond.buf);
 }
 void do_post(int fd, char *uri, char *host, char *postbuf, char *req, char *ref ,char *cookie)
 {
@@ -244,10 +247,11 @@ void user_info_init(char *info)
 }
 int main(int argc, char *argv[])
 {
-        int fd,fd_post_reg,fd_post_mail;
+        int fd,fd_post_reg,fd_post_mail,fd_verify;
         struct addrinfo *ai;
         struct sockaddr_in sin;
         char addrstr[32];
+        char *uri ;
         int errno;
         if(argc >= 2)
         {
@@ -283,7 +287,7 @@ int main(int argc, char *argv[])
                 {
                         DEBUG(MODE,"connection success!\n");
                         do_get(fd, (char *)&request, "/signup", addr, NULL);
-
+                        close(fd);
                         find_from_header(respond.header,  "Set-Cookie: ", (char *)&cookie_buf, 2048);
                         get_auth();
                         DEBUG(MODE,"\ncookie = %s\n",cookie_buf);
@@ -342,7 +346,7 @@ int main(int argc, char *argv[])
                                                 (char *)&cookie_buf);
                         close(fd_post_mail);
                         printf("mail is on the way!\n");
-                        sleep(20);
+                        sleep(30);
                         printf("\n*******************************\n");
                         email_main();
 
@@ -358,8 +362,20 @@ int main(int argc, char *argv[])
                                         "us008.asvpn.com -- us008.fast-as.info\n"
                                         "us009.asvpn.com -- us009.fast-as.info\n");
                         printf("\n******************************************************\n");
-                }
 
+                        fd_verify = socket(AF_INET, SOCK_STREAM, 0);
+                        if(connect(fd_verify, (struct sockaddr *)&sin, sizeof(sin)) == 0)
+                        {
+                                uri = (char *)(verify_url_final + 20);
+                                while(*uri != '\n')
+                                        uri++;
+                                *uri = '\0';
+                                uri = (char *)(verify_url_final + 20);
+                                printf("uri = %s\n",uri);
+                                memset(request, 0, sizeof(request));
+                                do_get(fd, (char *)&request, uri, addr, NULL);
+                        }
+                }
         }
 
 return 0;
@@ -414,7 +430,6 @@ char *user = "sunusgotvpn\r\n";
 char *pass = "vpngotsunus\r\n";
 char sendcmd[32];
 char mail_respond[1024] ;
-char verify_url_final[256];
 
 char *verify_url_0 = "http://www.asvpn.com/users/email_verify?username=";
 char *verify_url_1 = "&verify=";
@@ -498,10 +513,11 @@ char *email_get_verify_url(int fd)
                         /* Make the final verify_url */
                         sprintf(verify_url_final,"%s%s%s%s",verify_url_0,username,verify_url_1,verify_code);
                         printf("verify_url_final = :\n%s\n",verify_url_final);
+                        printf("uri = %s\n",(char *)(verify_url_final + 20));
                         free(pbase64_decode);
                         close(fd);
                         printf("username : %s\npassword : %s\nemail : %s\n",username,password,email);
-                        return (char *)&verify_url_final;
+                        return (char *)(verify_url_final + 20);
                 }
                 sleep(1);
         }
